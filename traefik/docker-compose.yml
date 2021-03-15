@@ -1,0 +1,47 @@
+version: '2'
+networks:
+  gateway:
+    external:
+      name: gateway-traefik
+services:
+  traefik:
+    image: "traefik:latest"
+    restart: always
+    command:
+      #- "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--accesslog.filePath=/traefik/access.log"
+      - "--accesslog.bufferingsize=100"
+      - "--accesslog.format=json"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=internal"
+      # HTTP / HTTPS
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Ovpn
+      - "--entrypoints.openvpn.address=:1194/udp"
+      # TLS
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${MAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    labels:
+      # Middlewares
+      - "traefik.http.middlewares.auth.basicauth.users=${USERS}"
+      - "traefik.http.middlewares.enforcehttps.redirectscheme.scheme=https"
+      # Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-web.entrypoints=web"
+      - "traefik.http.routers.traefik-web.rule=Host(`${HOST_TRAEFIK}`)"
+      - "traefik.http.routers.traefik-web.service=api@internal"
+      - "traefik.http.routers.traefik-web.middlewares=auth"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - letsencrypt:/letsencrypt
+      - traefik:/traefik
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - gateway
