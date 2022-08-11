@@ -1,0 +1,50 @@
+version: '3.1'
+
+networks:
+  gitlab:
+  
+services:
+  web:
+    image: 'gitlab/gitlab-ce:latest'
+    restart: always
+    hostname: '${DOMAIN_GITLAB}'
+    environment:
+      TZ: "Europe/Paris"
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://${DOMAIN_GITLAB}'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        # Configure headers for outgoing email.
+        gitlab_rails['gitlab_email_enabled'] = true
+        gitlab_rails['gitlab_email_from'] = '${GITLAB_MAIL_FROM}'
+        gitlab_rails['gitlab_email_display_name'] = '{GITLAB_MAIL_DISPLAY}'
+        gitlab_rails['gitlab_email_reply_to'] = '${GITLAB_MAIL_REPLY}'
+        # Send outgoing email via the SMTP container:
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "${SMTP_ADDRESS}"
+        gitlab_rails['smtp_user_name'] = "${SMTP_USER}"
+        gitlab_rails['smtp_password'] = "${SMTP_PASSWORD}"
+        gitlab_rails['smtp_port'] = 25
+        gitlab_rails['smtp_tls'] = true
+        # Limit backup lifetime to 7 days (604800 seconds):
+        gitlab_rails['backup_keep_time'] = 604800
+    ports:
+      - '80:80'
+      - '443:443'
+      - '2222:22'
+    volumes:
+      - './gitlab/config:/etc/gitlab'
+      - './gitlab/logs:/var/log/gitlab'
+      - './gitlab/data:/var/opt/gitlab'
+    networks:
+      - gitlab
+      
+  gitlab-runner:
+    restart: always
+    image: gitlab/gitlab-runner:alpine
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - './runner-data:/etc/gitlab-runner'
+    depends_on:
+      - web
+    networks:
+      - gitlab
